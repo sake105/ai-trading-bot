@@ -1,14 +1,25 @@
-import React from 'react';
-import { Activity, TrendingUp, ShieldAlert, DollarSign, BarChart3, Zap, Globe, ArrowUp, ArrowDown } from 'lucide-react';
-import { SystemStatus, MarketRegime } from '../types';
+import React, { useState } from 'react';
+import { Activity, ShieldAlert, DollarSign, BarChart3, Zap, ArrowUp, ArrowDown, BrainCircuit, Send } from 'lucide-react';
+import { SystemStatus, MarketRegime, AssetSignal, EconomicEvent, NewsItem, RiskMetrics } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import CorrelationMatrix from './CorrelationMatrix';
+import EconomicCalendar from './EconomicCalendar';
+import RiskGauge from './RiskGauge';
+import { askStrategyAgent } from '../services/geminiService';
 
 interface DashboardProps {
   status: SystemStatus;
+  signals: AssetSignal[];
+  macroEvents: EconomicEvent[];
+  news: NewsItem[];
+  riskMetrics: RiskMetrics;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ status }) => {
-  
+const Dashboard: React.FC<DashboardProps> = ({ status, signals, macroEvents, news, riskMetrics }) => {
+  const [strategyQuery, setStrategyQuery] = useState('');
+  const [strategyResponse, setStrategyResponse] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
+
   const getRegimeColor = (regime: MarketRegime) => {
     switch (regime) {
       case MarketRegime.RISK_ON: return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
@@ -23,7 +34,6 @@ const Dashboard: React.FC<DashboardProps> = ({ status }) => {
     { name: 'Cash', value: 30 },
   ];
 
-  // Mock Indices Data for Dashboard Header
   const indices = [
     { name: 'S&P 500', value: '4,785.20', change: '+1.2%', up: true },
     { name: 'NASDAQ', value: '16,420.10', change: '+1.8%', up: true },
@@ -31,9 +41,48 @@ const Dashboard: React.FC<DashboardProps> = ({ status }) => {
     { name: 'RUT 2000', value: '1,980.50', change: '+0.5%', up: true },
   ];
 
+  const handleStrategyQuery = async () => {
+    if (!strategyQuery) return;
+    setIsThinking(true);
+    const response = await askStrategyAgent(strategyQuery, status, signals, news, macroEvents);
+    setStrategyResponse(response);
+    setIsThinking(false);
+  };
+
   return (
     <div className="space-y-6">
       
+      {/* Strategy Command Center (Gemini 3 Pro) */}
+      <div className="bg-gradient-to-r from-slate-900 to-indigo-950 p-6 rounded-xl border border-indigo-500/30 shadow-lg">
+         <h3 className="text-white font-bold flex items-center gap-2 mb-3">
+            <BrainCircuit className="w-5 h-5 text-indigo-400" />
+            Deep Strategy Agent (Gemini 3 Pro)
+         </h3>
+         <div className="flex gap-2">
+            <input 
+                type="text" 
+                value={strategyQuery}
+                onChange={(e) => setStrategyQuery(e.target.value)}
+                placeholder="Ask complex strategic questions (e.g., 'How should I position for the upcoming CPI print considering Tech correlations?')"
+                className="flex-1 bg-slate-950/50 border border-indigo-500/30 rounded-lg px-4 py-2 text-sm text-white placeholder:text-indigo-200/50 focus:ring-indigo-500 focus:border-indigo-500"
+                onKeyDown={(e) => e.key === 'Enter' && handleStrategyQuery()}
+            />
+            <button 
+                onClick={handleStrategyQuery}
+                disabled={isThinking}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors disabled:opacity-50"
+            >
+                {isThinking ? <BrainCircuit className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {isThinking ? 'Thinking...' : 'Strategize'}
+            </button>
+         </div>
+         {strategyResponse && (
+             <div className="mt-4 p-4 bg-slate-950/50 rounded-lg border border-indigo-500/20 text-sm text-indigo-100 leading-relaxed whitespace-pre-line animate-in fade-in slide-in-from-top-2">
+                 {strategyResponse}
+             </div>
+         )}
+      </div>
+
       {/* Indices Ticker */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {indices.map((idx) => (
@@ -96,16 +145,15 @@ const Dashboard: React.FC<DashboardProps> = ({ status }) => {
         </div>
       </div>
 
-      {/* Charts Row */}
+      {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* System Health / Exposure */}
         <div className="lg:col-span-2 bg-slate-900 p-6 rounded-xl border border-slate-800">
           <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <ShieldAlert className="h-5 w-5 text-indigo-400" />
             Portfolio Exposure Breakdown
           </h4>
           <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart layout="vertical" data={mockExposureData}>
                 <XAxis type="number" stroke="#64748b" fontSize={12} />
                 <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={12} width={100} />
@@ -123,27 +171,20 @@ const Dashboard: React.FC<DashboardProps> = ({ status }) => {
           </div>
         </div>
 
-        {/* Global Logistics Quick View */}
-        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 flex flex-col">
-          <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-             <Globe className="h-5 w-5 text-blue-400" />
-             Global Context
-          </h4>
-          <div className="flex-1 flex flex-col justify-center gap-4">
-             <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                <span className="text-sm text-slate-400">Supply Chain Strain</span>
-                <span className="text-sm font-bold text-amber-500">Elevated (65/100)</span>
-             </div>
-             <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                <span className="text-sm text-slate-400">Insider Net Flow</span>
-                <span className="text-sm font-bold text-emerald-400">+Buy Bias</span>
-             </div>
-             <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                <span className="text-sm text-slate-400">News Sentiment</span>
-                <span className="text-sm font-bold text-slate-200">Neutral-Positive</span>
-             </div>
-          </div>
+        {/* RISK GAUGE */}
+        <div className="lg:col-span-1 h-[350px]">
+           <RiskGauge metrics={riskMetrics} />
         </div>
+      </div>
+
+      {/* Charts Row 2 (Advanced Tools) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+         <div className="lg:col-span-2">
+            <CorrelationMatrix signals={signals} />
+         </div>
+         <div className="lg:col-span-1">
+            <EconomicCalendar events={macroEvents} />
+         </div>
       </div>
     </div>
   );
