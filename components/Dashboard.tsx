@@ -1,17 +1,19 @@
+
 import React, { useState } from 'react';
 import { Activity, ShieldAlert, DollarSign, BarChart3, Zap, ArrowUp, ArrowDown, BrainCircuit, Send } from 'lucide-react';
-import { SystemStatus, MarketRegime, AssetSignal, EconomicEvent, NewsItem, RiskMetrics } from '../types';
+import { RiskMetrics, Signal, Event } from '../types/domain'; // Updated Import
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import CorrelationMatrix from './CorrelationMatrix';
+import CorrelationMatrix from './CorrelationMatrix'; // Needs check
 import EconomicCalendar from './EconomicCalendar';
 import RiskGauge from './RiskGauge';
 import { askStrategyAgent } from '../services/geminiService';
 
+// Adapter Interface to bridge old generic types to new Domain types
 interface DashboardProps {
-  status: SystemStatus;
-  signals: AssetSignal[];
-  macroEvents: EconomicEvent[];
-  news: NewsItem[];
+  status: any; // Keep loose for now to avoid break
+  signals: Signal[]; // Use Domain Signal
+  macroEvents: any[]; 
+  news: any[];
   riskMetrics: RiskMetrics;
 }
 
@@ -20,10 +22,10 @@ const Dashboard: React.FC<DashboardProps> = ({ status, signals, macroEvents, new
   const [strategyResponse, setStrategyResponse] = useState('');
   const [isThinking, setIsThinking] = useState(false);
 
-  const getRegimeColor = (regime: MarketRegime) => {
+  const getRegimeColor = (regime: string) => {
     switch (regime) {
-      case MarketRegime.RISK_ON: return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
-      case MarketRegime.RISK_OFF: return 'text-rose-400 bg-rose-400/10 border-rose-400/20';
+      case 'RISK_ON': return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
+      case 'RISK_OFF': return 'text-rose-400 bg-rose-400/10 border-rose-400/20';
       default: return 'text-amber-400 bg-amber-400/10 border-amber-400/20';
     }
   };
@@ -44,10 +46,36 @@ const Dashboard: React.FC<DashboardProps> = ({ status, signals, macroEvents, new
   const handleStrategyQuery = async () => {
     if (!strategyQuery) return;
     setIsThinking(true);
-    const response = await askStrategyAgent(strategyQuery, status, signals, news, macroEvents);
+    // Cast back to old types for service compatibility until service is refactored
+    const response = await askStrategyAgent(strategyQuery, status, signals as any, news, macroEvents);
     setStrategyResponse(response);
     setIsThinking(false);
   };
+
+  // Adapter for RiskGauge (Legacy)
+  const legacyRiskMetrics = {
+      var95: riskMetrics.var95,
+      var99: riskMetrics.cvar95 * 0.8, // Approximation as not in Domain
+      cvar95: riskMetrics.cvar95,
+      sharpeRatio: riskMetrics.sharpeRatio,
+      volatility: riskMetrics.volatilityAnn * 100, // Domain decimal to Legacy percent
+      beta: riskMetrics.beta
+  };
+
+  // Adapter for CorrelationMatrix (Legacy)
+  const legacySignals = signals.map(s => ({
+      ticker: s.instrument.id,
+      sector: s.instrument.sector,
+      trendScore: s.trendScore,
+      compositeScore: s.compositeScore,
+      // Mock other required fields for legacy comp
+      price: s.entryPrice,
+      volume: s.volume,
+      changePercent: 0,
+      mlConfidence: s.conviction,
+      volatility: 0.2,
+      signal: s.direction === 'LONG' ? 'BUY' : s.direction === 'SHORT' ? 'SELL' : 'HOLD'
+  }));
 
   return (
     <div className="space-y-6">
@@ -121,7 +149,7 @@ const Dashboard: React.FC<DashboardProps> = ({ status, signals, macroEvents, new
             <DollarSign className="h-5 w-5" />
           </div>
           <h3 className={`text-2xl font-bold mt-1 ${status.dailyPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {status.dailyPnl >= 0 ? '+' : ''}{status.dailyPnl.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+            {status.dailyPnl >= 0 ? '+' : ''}{(status.dailyPnl ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
           </h3>
           <p className="text-xs text-slate-500 mt-2">Realized + Unrealized</p>
         </div>
@@ -153,7 +181,7 @@ const Dashboard: React.FC<DashboardProps> = ({ status, signals, macroEvents, new
             Portfolio Exposure Breakdown
           </h4>
           <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart layout="vertical" data={mockExposureData}>
                 <XAxis type="number" stroke="#64748b" fontSize={12} />
                 <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={12} width={100} />
@@ -173,14 +201,14 @@ const Dashboard: React.FC<DashboardProps> = ({ status, signals, macroEvents, new
 
         {/* RISK GAUGE */}
         <div className="lg:col-span-1 h-[350px]">
-           <RiskGauge metrics={riskMetrics} />
+           <RiskGauge metrics={legacyRiskMetrics} />
         </div>
       </div>
 
       {/* Charts Row 2 (Advanced Tools) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
          <div className="lg:col-span-2">
-            <CorrelationMatrix signals={signals} />
+            <CorrelationMatrix signals={legacySignals as any} />
          </div>
          <div className="lg:col-span-1">
             <EconomicCalendar events={macroEvents} />

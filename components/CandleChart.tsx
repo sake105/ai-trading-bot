@@ -9,27 +9,90 @@ interface CandleChartProps {
 const CandleChart: React.FC<CandleChartProps> = ({ signal }) => {
   const container = useRef<HTMLDivElement>(null);
 
-  // Helper to map Finnhub Tickers to TradingView Symbols
+  // Comprehensive Mapping from Internal Tickers (Finnhub/Yahoo style) to TradingView Symbols
   const getTradingViewSymbol = (ticker: string): string => {
-    // German Market
+    const map: Record<string, string> = {
+      // German / DAX / XETRA
+      'RHM.DE': 'XETRA:RHM',
+      'TKA.DE': 'XETRA:TKA',
+      'R3NK.DE': 'XETRA:R3NK',
+      'HAG.DE': 'XETRA:HAG',
+      'PAH3.DE': 'XETRA:PAH3',
+      'VOW3.DE': 'XETRA:VOW3',
+      'SRT.DE': 'XETRA:SRT',
+      'SMHN.DE': 'XETRA:SMHN',
+      'EUZ.DE': 'XETRA:EUZ',
+      'IOS': 'XETRA:IOS', // Ionos Group
+
+      // UK / LSE
+      'RR.L': 'LSE:RR.',
+      'BA.L': 'LSE:BA.',
+
+      // Europe Other
+      'AIR.PA': 'EURONEXT:AIR',
+      'BAVA.CO': 'OMXCOP:BAVA', // Bavarian Nordic (Copenhagen)
+
+      // US Tech (NASDAQ)
+      'NVDA': 'NASDAQ:NVDA',
+      'AMD': 'NASDAQ:AMD',
+      'INTC': 'NASDAQ:INTC',
+      'ASML': 'NASDAQ:ASML',
+      'AVGO': 'NASDAQ:AVGO',
+      'MU': 'NASDAQ:MU',
+      'QCOM': 'NASDAQ:QCOM',
+      'SMCI': 'NASDAQ:SMCI',
+      'MSFT': 'NASDAQ:MSFT',
+      'GOOGL': 'NASDAQ:GOOGL',
+      'META': 'NASDAQ:META',
+      'ADBE': 'NASDAQ:ADBE',
+      'DBX': 'NASDAQ:DBX',
+      'QMCO': 'NASDAQ:QMCO',
+      'AXON': 'NASDAQ:AXON',
+      'PLUG': 'NASDAQ:PLUG',
+      'TSLA': 'NASDAQ:TSLA',
+      'MSTR': 'NASDAQ:MSTR',
+      'VRNA': 'NASDAQ:VRNA',
+
+      // US NYSE / Others
+      'TSM': 'NYSE:TSM',
+      'ORCL': 'NYSE:ORCL',
+      'PLTR': 'NYSE:PLTR',
+      'ACN': 'NYSE:ACN',
+      'DELL': 'NYSE:DELL',
+      'U': 'NYSE:U',
+      'QBTS': 'NYSE:QBTS',
+      'LMT': 'NYSE:LMT',
+      'NOC': 'NYSE:NOC',
+      'BA': 'NYSE:BA',
+      'PBR': 'NYSE:PBR',
+      'ALB': 'NYSE:ALB',
+      'SPGI': 'NYSE:SPGI',
+      'UAA': 'NYSE:UAA',
+      'XOM': 'NYSE:XOM',
+      'XPEV': 'NYSE:XPEV',
+
+      // Australia
+      'DRO.AX': 'ASX:DRO',
+
+      // Commodities / Indices
+      'WTI': 'TVC:USOIL',
+    };
+
+    if (map[ticker]) return map[ticker];
+
+    // Fallback Heuristics
     if (ticker.includes('.DE')) return `XETRA:${ticker.split('.')[0]}`;
-    // London
     if (ticker.includes('.L')) return `LSE:${ticker.split('.')[0]}`;
-    // Paris
     if (ticker.includes('.PA')) return `EURONEXT:${ticker.split('.')[0]}`;
-    // Crypto
-    if (ticker === 'BTC' || ticker === 'ETH') return `BINANCE:${ticker}USDT`;
-    // Indices / Commodities
-    if (ticker === 'WTI') return 'TVC:USOIL';
     
-    // Default US (Try NASDAQ first, fallback handled by TV usually)
+    // Default assumption: NASDAQ if not found (common for tech)
     return `NASDAQ:${ticker}`;
   };
 
   useEffect(() => {
     if (!container.current) return;
 
-    // Clear previous widget
+    // Clear previous widget to prevent duplicates
     container.current.innerHTML = '';
 
     const script = document.createElement("script");
@@ -52,7 +115,7 @@ const CandleChart: React.FC<CandleChartProps> = ({ signal }) => {
       "hide_side_toolbar": false,
       "allow_symbol_change": true,
       "details": true,
-      "hotlist": true,
+      "hotlist": false,
       "calendar": false,
       "support_host": "https://www.tradingview.com"
     });
