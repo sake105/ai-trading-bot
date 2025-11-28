@@ -5,12 +5,14 @@ import type {
   PortfolioSnapshot,
   RiskMetrics,
   QaStatus,
+  Signal
 } from '../../types/domain';
 import { LoadingSpinner } from '../../shared/components/LoadingSpinner';
 import { ErrorState } from '../../shared/components/ErrorState';
 import { PnLChart } from './components/PnLChart';
 import { EquityCurve } from './components/EquityCurve';
 import { ExposureSummary } from './components/ExposureSummary';
+import { MarketWatch } from './components/MarketWatch';
 import { Card } from '../../shared/components/Card';
 import { Badge } from '../../shared/components/Badge';
 import { formatPercent } from '../../shared/utils/formatters';
@@ -25,20 +27,23 @@ export function DashboardPage() {
   const [portfolio, setPortfolio] = useState<PortfolioSnapshot | null>(null);
   const [risk, setRisk] = useState<RiskMetrics | null>(null);
   const [qa, setQa] = useState<QaStatus | null>(null);
+  const [signals, setSignals] = useState<Signal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [p, r, q] = await Promise.all([
+      const [p, r, q, s] = await Promise.all([
         BackendApi.getPortfolio(),
         BackendApi.getRisk(),
         BackendApi.getQaStatus(),
+        BackendApi.getSignals()
       ]);
       setPortfolio(p);
       setRisk(r);
       setQa(q);
+      setSignals(s);
       setError(null);
     } catch (e: any) {
       console.error(e);
@@ -133,10 +138,13 @@ export function DashboardPage() {
           </div>
         </Card>
       </div>
+      
       <div className="grid-2">
         <ExposureSummary positions={portfolio.positions} />
+        <div style={{ gridColumn: 'span 2' }}>
+            <MarketWatch signals={signals} />
+        </div>
       </div>
-      {loading && <LoadingSpinner />}
     </Page>
   );
 }
