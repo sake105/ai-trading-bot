@@ -6,14 +6,16 @@ import { ConnectionStatus } from '../shared/components/ConnectionStatus';
 
 interface Props {
   children: ReactNode;
+  isLive: boolean;
+  toggleLive: () => void;
 }
 
-export function AppLayout({ children }: Props) {
+export function AppLayout({ children, isLive, toggleLive }: Props) {
   return (
     <div className="app-root">
       <Sidebar />
       <div className="app-main">
-        <Topbar />
+        <Topbar isLive={isLive} toggleLive={toggleLive} />
         <ConnectionStatus />
         <main className="app-content">{children}</main>
       </div>

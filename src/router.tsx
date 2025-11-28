@@ -7,6 +7,7 @@ import { QaPage } from './features/qa/QaPage';
 import { EventsPage } from './features/events/EventsPage';
 import { CongressPage } from './features/congress/CongressPage';
 import { ShippingPage } from './features/shipping/ShippingPage';
+import { SettingsPage } from './features/settings/SettingsPage';
 import { features } from './config/features';
 
 export function AppRouter() {
@@ -18,6 +19,7 @@ export function AppRouter() {
       <Route path="/risk" element={<RiskPage />} />
       <Route path="/qa" element={<QaPage />} />
       <Route path="/events" element={<EventsPage />} />
+      <Route path="/settings" element={<SettingsPage />} />
       {features.congress && <Route path="/congress" element={<CongressPage />} />}
       {features.shipping && <Route path="/shipping" element={<ShippingPage />} />}
     </Routes>

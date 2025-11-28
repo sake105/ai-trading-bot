@@ -82,6 +82,8 @@ export interface RiskMetrics {
   grossExposure: number;
   netExposure: number;
   turnover1D: number;
+  beta: number;
+  sharpeRatio: number;
 }
 
 export interface QaStatus {

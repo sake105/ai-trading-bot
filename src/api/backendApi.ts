@@ -10,17 +10,14 @@ import type {
 import { httpGet, httpPost } from './httpClient';
 import { USE_MOCKS } from '../config/env';
 
-// We import the previous services to maintain the "Real" data logic we built
+// Import Realtime Logic
 import { generateInitialMarketState, RealtimeMarketService } from '../services/marketService';
-import { MathService } from '../services/mathService';
 
-// BRIDGE: Adapt the existing MarketService to the new API Interface
-// This ensures we don't lose the "Real" prices from Finnhub
 const marketService = new RealtimeMarketService();
 let cachedState = generateInitialMarketState();
 let pendingOrders: OrderPreview[] = [];
 
-// Initialize Orders from State
+// Mock Init
 const initOrders = () => {
     pendingOrders = cachedState.signals.slice(0, 3).map((s, i) => ({
         id: `ord-${i}`,
@@ -29,7 +26,7 @@ const initOrders = () => {
             id: s.ticker,
             name: s.name,
             assetClass: 'EQUITY',
-            currency: 'USD', // Simplified
+            currency: s.ticker.includes('.DE') ? 'EUR' : 'USD',
             sector: s.sector
         },
         side: s.signal === 'BUY' ? 'BUY' : 'SELL',
@@ -39,21 +36,29 @@ const initOrders = () => {
         validity: 'DAY',
         estimatedCost: s.price * 10,
         estimatedFees: 2,
-        comment: 'System Generated'
+        comment: 'System Generated',
+        status: 'PENDING'
     }));
 };
 initOrders();
 
 const MockApi = {
   async getSignals(): Promise<Signal[]> {
-    // Adapt AssetSignal to new Signal domain type
+    // Try to fetch real quotes to update the state before returning
+    // This is the "Live Data Injection"
+    try {
+        await marketService.fetchQuotes(cachedState.signals.map(s => s.ticker));
+        // In a full backend, marketService would update cachedState. 
+        // Here we rely on the fact that generateInitialMarketState uses APPROX_PRICES which we updated.
+    } catch(e) { console.warn("Live fetch failed", e); }
+
     return cachedState.signals.map(s => ({
         id: `sig-${s.ticker}`,
         instrument: {
             id: s.ticker,
             name: s.name,
             assetClass: 'EQUITY',
-            currency: 'USD',
+            currency: s.ticker.includes('.DE') ? 'EUR' : 'USD',
             sector: s.sector
         },
         timestamp: new Date().toISOString(),
@@ -78,7 +83,6 @@ const MockApi = {
 
   async approveOrder(id: string): Promise<void> {
     pendingOrders = pendingOrders.filter(o => o.id !== id);
-    // In real app, send to execution engine
   },
 
   async rejectOrder(id: string): Promise<void> {
@@ -86,7 +90,6 @@ const MockApi = {
   },
 
   async getPortfolio(): Promise<PortfolioSnapshot> {
-    // Adapt the mock portfolio
     const positions = cachedState.signals.slice(0, 5).map(s => ({
         instrument: { id: s.ticker, name: s.name, assetClass: 'EQUITY', currency: 'USD', sector: s.sector },
         quantity: 100,
@@ -97,17 +100,11 @@ const MockApi = {
         weight: 0.1
     }));
 
-    // Create fake history for charts
     const history = Array.from({length: 30}).map((_, i) => ({
         timestamp: new Date(Date.now() - (29-i)*86400000).toISOString(),
         value: 100000 + (i * 1000) + (Math.random() * 2000)
     }));
     
-    const pnlHistory = history.map(h => ({
-        timestamp: h.timestamp,
-        value: (Math.random() * 1000) - 200
-    }));
-
     return {
         timestamp: new Date().toISOString(),
         equity: 120000,
@@ -116,7 +113,7 @@ const MockApi = {
         realizedPnl1D: 150,
         realizedPnlYtd: 5000,
         equityHistory: history,
-        pnlHistory1M: pnlHistory
+        pnlHistory1M: history.map(h => ({ timestamp: h.timestamp, value: (Math.random() * 1000) - 200 }))
     };
   },
 
@@ -129,7 +126,9 @@ const MockApi = {
         cvar95: -4000,
         grossExposure: 0.8,
         netExposure: 0.6,
-        turnover1D: 0.05
+        turnover1D: 0.05,
+        beta: 1.1,
+        sharpeRatio: 1.8
     };
   },
 
@@ -149,7 +148,7 @@ const MockApi = {
       const allEvents = [
           ...cachedState.newsItems.map((n, i) => ({
               id: `news-${i}`,
-              type: 'COMPANY_NEWS',
+              type: 'COMPANY_NEWS' as const,
               timestampSource: n.timestamp,
               timestampEffective: n.timestamp,
               source: n.source,
@@ -158,12 +157,14 @@ const MockApi = {
               countries: [],
               routes: [],
               politicians: [],
+              title: n.title,
+              summary: n.summary,
               sentiment: { polarity: 0.5, confidence: 0.8 },
               metadata: { rawHeadline: n.title, url: n.url }
           })),
           {
               id: 'cong-1',
-              type: 'CONGRESS_TRADE',
+              type: 'CONGRESS_TRADE' as const,
               timestampSource: new Date().toISOString(),
               timestampEffective: new Date().toISOString(),
               source: 'Senate',
@@ -172,32 +173,19 @@ const MockApi = {
               countries: ['US'],
               routes: [],
               politicians: ['Nancy Pelosi'],
+              title: 'Pelosi Buys NVDA',
+              summary: 'Disclosed purchase of Call Options.',
               metadata: { rawHeadline: 'Pelosi buys NVDA Calls' }
-          },
-           {
-              id: 'ship-1',
-              type: 'SHIPPING',
-              timestampSource: new Date().toISOString(),
-              timestampEffective: new Date().toISOString(),
-              source: 'AIS',
-              tickers: [],
-              sectors: ['Shipping'],
-              countries: [],
-              routes: ['Suez', 'Red Sea'],
-              politicians: [],
-              metadata: { rawHeadline: 'Congestion in Red Sea increasing' }
           }
       ];
 
-      if (params?.type) {
-          return allEvents.filter(e => e.type === params.type) as Event[];
+      if (params?.type && params.type !== 'ALL') {
+          return allEvents.filter(e => e.type === params.type);
       }
-      return allEvents as Event[];
+      return allEvents;
   }
 };
 
-// If USE_MOCKS is true (which it is in env), use the internal logic. 
-// Otherwise try to hit localhost:8000
 export const BackendApi = USE_MOCKS ? MockApi : {
     getSignals: () => httpGet<Signal[]>('/signals/today'),
     getOrderPreviews: () => httpGet<OrderPreview[]>('/orders/previews'),

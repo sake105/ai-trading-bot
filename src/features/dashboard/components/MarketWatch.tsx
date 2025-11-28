@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { Signal } from '../../../types/domain';
 import { LayoutGrid, List, ChevronUp, ChevronDown, ArrowUpRight, ArrowDownRight, Minus, LineChart, Activity, Brain, Newspaper } from 'lucide-react';
@@ -76,7 +77,7 @@ export function MarketWatch({ signals }: Props) {
                         {s.instrument.id}
                         <div style={{ fontSize: 10, color: '#9ba4c4', fontWeight: 'normal' }}>{s.instrument.sector}</div>
                     </td>
-                    <td className="p-2 font-mono">{s.entryPrice.toFixed(2)} {s.instrument.currency}</td>
+                    <td className="p-2 font-mono">{(s.entryPrice ?? 0).toFixed(2)} {s.instrument.currency}</td>
                     <td className="p-2">
                         <div className="flex items-center gap-2">
                             <div style={{ width: 40, height: 4, background: '#262b3b', borderRadius: 2 }}>
@@ -135,7 +136,7 @@ export function MarketWatch({ signals }: Props) {
                                 {activeTab === 'CHART' && <CandleChart ticker={s.instrument.id} />}
                                 {activeTab === 'TECHNICALS' && (
                                     <div className="grid grid-cols-2 gap-4 text-xs text-[#9ba4c4]">
-                                        <div>RSI: <span className="text-white">{s.rsi?.toFixed(1)}</span></div>
+                                        <div>RSI: <span className="text-white">{(s.rsi ?? 0).toFixed(1)}</span></div>
                                         <div>Vol: <span className="text-white">{(s.volume || 0).toLocaleString()}</span></div>
                                         <div>Composite: <span className="text-[#7b5cff]">{s.compositeScore}</span></div>
                                     </div>

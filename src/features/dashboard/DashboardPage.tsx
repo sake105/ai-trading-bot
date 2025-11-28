@@ -13,6 +13,7 @@ import { PnLChart } from './components/PnLChart';
 import { EquityCurve } from './components/EquityCurve';
 import { ExposureSummary } from './components/ExposureSummary';
 import { MarketWatch } from './components/MarketWatch';
+import { StrategyAgent } from './components/StrategyAgent';
 import { Card } from '../../shared/components/Card';
 import { Badge } from '../../shared/components/Badge';
 import { formatPercent } from '../../shared/utils/formatters';
@@ -33,7 +34,7 @@ export function DashboardPage() {
 
   const load = useCallback(async () => {
     try {
-      setLoading(true);
+      // Parallel fetch for speed
       const [p, r, q, s] = await Promise.all([
         BackendApi.getPortfolio(),
         BackendApi.getRisk(),
@@ -57,7 +58,7 @@ export function DashboardPage() {
     void load();
   }, [load]);
 
-  // Auto-Refresh alle 60s
+  // Auto-Refresh every 60s
   usePolling(load, 60000);
 
   // Live-Updates via WebSocket (optional)
@@ -74,12 +75,13 @@ export function DashboardPage() {
     },
   });
 
-  if (loading && !portfolio && !risk && !qa) {
+  if (loading && !portfolio) {
     return (
       <Page title="Dashboard" subtitle="Cockpit für Handel, Risk & QA">
-        <Skeleton height={160} />
-        <Skeleton height={160} />
-        <Skeleton height={160} />
+        <div className="grid gap-6">
+          <Skeleton height={200} />
+          <Skeleton height={400} />
+        </div>
       </Page>
     );
   }
@@ -117,6 +119,10 @@ export function DashboardPage() {
         </Button>
       }
     >
+      {/* Top Row: Strategy AI */}
+      <StrategyAgent />
+
+      {/* Middle Row: Stats & Charts */}
       <div className="grid-3">
         <PnLChart
           history={portfolio.pnlHistory1M}
@@ -139,10 +145,13 @@ export function DashboardPage() {
         </Card>
       </div>
       
-      <div className="grid-2">
-        <ExposureSummary positions={portfolio.positions} />
-        <div style={{ gridColumn: 'span 2' }}>
-            <MarketWatch signals={signals} />
+      {/* Bottom Row: Exposure & Market Watch */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1">
+           <ExposureSummary positions={portfolio.positions} />
+        </div>
+        <div className="lg:col-span-2">
+           <MarketWatch signals={signals} />
         </div>
       </div>
     </Page>
